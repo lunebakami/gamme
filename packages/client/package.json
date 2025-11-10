@@ -1,12 +1,21 @@
 {
-  "name": "client",
+  "name": "@gamme/client",
   "module": "index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/three": "^0.181.0",
+    "vite": "^7.2.2"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@gamme/shared": "workspace:*",
+    "three": "^0.181.0"
   }
 }
