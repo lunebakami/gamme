@@ -10,7 +10,8 @@
     "typescript": "^5"
   },
   "scripts": {
-    "dev": "bun --watch src/index.ts"
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts"
   },
   "dependencies": {
     "@elysiajs/websocket": "^0.2.8",

@@ -1,0 +1,22 @@
+services:
+  # Server Service
+  - type: web
+    name: gamme-server
+    env: node
+    plan: free
+    buildCommand: cd packages/server && bun install
+    startCommand: cd packages/server && bun run src/index.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
+
+  # Client Service  
+  - type: static
+    name: gamme-client
+    plan: free
+    buildCommand: cd packages/client && bun install && bun run build
+    staticPublishPath: packages/client/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://gamme-server.onrender.com
