@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GAME_CONFIG } from '@gamme/shared';
+import { GAME_CONFIG, type PlayerState } from '@gamme/shared';
 
 console.log('Game config:', GAME_CONFIG);
 
@@ -50,7 +50,7 @@ window.addEventListener('resize', () => {
 // GAME OVER
 let isGameOver = false;
 const groundSize = 20;
-const groundBoundary = groundSize/2;
+const groundBoundary = groundSize / 2;
 let fallInterval: Timer | null = null;
 
 const gameOverDiv = document.createElement('div');
@@ -135,7 +135,7 @@ window.addEventListener('keydown', (e) => {
 
     setTimeout(() => {
       dashCooldown = false;
-    },dashCooldownTime)
+    }, dashCooldownTime)
   }
 })
 
@@ -178,8 +178,8 @@ function updateMovement() {
   }
 
   if ((Math.abs(cube.position.x) > groundBoundary ||
-     Math.abs(cube.position.z) > groundBoundary) &&
-     cube.position.y <= groundY) {
+    Math.abs(cube.position.z) > groundBoundary) &&
+    cube.position.y <= groundY) {
     isGameOver = true;
     gameOverDiv.style.display = 'block';
 
@@ -196,6 +196,157 @@ function updateMovement() {
     }, 16);
   }
 }
+
+// Create name input modal
+const nameModal = document.createElement('div');
+nameModal.style.cssText = `
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`;
+nameModal.innerHTML = `
+  <div style="
+    background: white;
+    padding: 40px;
+    border-radius: 10px;
+    text-align: center;
+  ">
+    <h1 style="margin-bottom: 20px;">Enter Your Name</h1>
+    <input 
+      type="text" 
+      id="player-name" 
+      placeholder="Your name"
+      maxlength="15"
+      style="
+        padding: 10px;
+        font-size: 18px;
+        width: 250px;
+        margin-bottom: 20px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+      "
+    />
+    <br>
+    <button id="join-game" style="
+      padding: 15px 30px;
+      font-size: 18px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    ">Join Game</button>
+  </div>
+`;
+document.body.appendChild(nameModal);
+
+// WebSocket connection
+let ws: WebSocket | null = null;
+let myPlayerId: string | null = null;
+const otherPlayers = new Map<string, THREE.Mesh>();
+
+document.getElementById('join-game')?.addEventListener('click', () => {
+  const nameInput = document.getElementById('player-name') as HTMLInputElement;
+  const playerName = nameInput.value.trim()
+
+  if (playerName) {
+    connectToServer(playerName);
+    nameModal.remove();
+  } else {
+    alert('Please enter a name!');
+  }
+});
+
+document.getElementById('player-name')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    document.getElementById('join-game')?.click();
+  }
+});
+
+function connectToServer(playerName: string) {
+  ws = new WebSocket(GAME_CONFIG.SERVER_URL + '/game');
+
+  ws.onopen = () => {
+    console.log('WebSocket connection opened');
+
+    ws?.send(JSON.stringify({
+      type: 'player:join',
+      name: playerName
+    }));
+  }
+
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === 'game:init') {
+      myPlayerId = data.yourId;
+      console.log('My player ID:', myPlayerId)
+      console.log('Current players', data.players)
+
+      // Spawn other players(not yourself)
+      data.players.forEach((player: PlayerState) => {
+        if (player.id !== myPlayerId) {
+          spawnOtherPlayer(player);
+        }
+      })
+    }
+
+    if (data.type === 'player:joined') {
+      console.log('Player joined:', data)
+      const player = data.player;
+      if (player.id !== myPlayerId) {
+        console.log('Player joined:', player.name)
+        spawnOtherPlayer(player);
+      }
+    }
+
+    if (data.type === 'player:left') {
+      console.log('Player left:', data.id)
+      removeOtherPlayer(data.id)
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+
+  ws.onclose = () => {
+    console.log('Disconnected from server');
+  };
+}
+
+function spawnOtherPlayer(player: PlayerState) {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+  const playerCube = new THREE.Mesh(geometry, material);
+
+  playerCube.position.set(
+    player.position.x,
+    player.position.y,
+    player.position.z
+  );
+
+  scene.add(playerCube)
+  otherPlayers.set(player.id, playerCube);
+
+  console.log('Spawned player:', player.name)
+}
+
+function removeOtherPlayer(playerId: string) {
+  const playerCube = otherPlayers.get(playerId);
+  if (playerCube) {
+    scene.remove(playerCube);
+    otherPlayers.delete(playerId);
+  }
+}
+
 
 // GAME LOOP
 function animate() {
