@@ -10,7 +10,8 @@ export interface PlayerState {
 export const GAME_CONFIG = {
   TICK_RATE: 60,
   MAX_PLAYERS: 4,
-  SERVER_URL: 'ws://localhost:3000'
+  SERVER_URL: 'ws://localhost:3000',
+  UPDATE_RATE: 50,
 } as const;
 
 export interface GameState {
@@ -18,13 +19,26 @@ export interface GameState {
 }
 
 export interface ClientToServerEvents {
-  'player:join': { name: string }
+  'player:join': { name: string },
+  'player:move': {
+    position: { x: number; y: number; z: number };
+    rotation: number;
+  }
 }
 
 export interface ServerToClientEvents {
   'game.init': { players: PlayerState[], yourId: string },
   'player:joined': PlayerState,
-  'player:left': { id: string }
+  'player:left': { id: string },
+  'player:update': {
+    id: string,
+    position: {
+      x: number;
+      y: number;
+      z: number;
+    },
+    rotation: number;
+  }
 }
 
 console.log('Shared package loaded');

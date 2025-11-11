@@ -44,6 +44,22 @@ const app = new Elysia()
 
         console.log(`Player ${data.name} (${playerId}) joined. Total players: ${players.size}`);
       }
+
+      if (data.type === 'player:move') {
+        const playerId = ws.id;
+        const player = players.get(playerId);
+        if (player) {
+          player.position = data.position;
+          player.rotation = data.rotation;
+
+          ws.publish('game', JSON.stringify({
+            type: 'player:update',
+            id: playerId,
+            position: data.position,
+            rotation: data.rotation,
+          }))
+        }
+      }
     },
     close(ws) {
       const playerId = ws.id;

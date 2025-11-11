@@ -165,7 +165,7 @@ function updateMovement() {
   }
 
   // Jump physics
-  if (isJumping) {
+if (isJumping) {
     velocityY += gravity;
     cube.position.y += velocityY;
 
@@ -175,6 +175,23 @@ function updateMovement() {
       velocityY = 0;
       isJumping = false;
     }
+  }
+
+  // Send position to server (throttled)
+  const now = Date.now();
+  if (ws && ws.readyState === WebSocket.OPEN &&
+      now - lastPositionSent > POSITION_UPDATE_INTERVAL
+  ) {
+    ws.send(JSON.stringify({
+      type: 'player:move',
+      position: {
+        x: cube.position.x,
+        y: cube.position.y,
+        z: cube.position.z,
+      },
+      rotation: cube.rotation.y
+    }));
+    lastPositionSent = now;
   }
 
   if ((Math.abs(cube.position.x) > groundBoundary ||
@@ -219,9 +236,9 @@ nameModal.innerHTML = `
     text-align: center;
   ">
     <h1 style="margin-bottom: 20px;">Enter Your Name</h1>
-    <input 
-      type="text" 
-      id="player-name" 
+    <input
+      type="text"
+      id="player-name"
       placeholder="Your name"
       maxlength="15"
       style="
@@ -251,6 +268,10 @@ document.body.appendChild(nameModal);
 let ws: WebSocket | null = null;
 let myPlayerId: string | null = null;
 const otherPlayers = new Map<string, THREE.Mesh>();
+
+// Position update throttling
+let lastPositionSent = 0;
+const POSITION_UPDATE_INTERVAL = 50;
 
 document.getElementById('join-game')?.addEventListener('click', () => {
   const nameInput = document.getElementById('player-name') as HTMLInputElement;
@@ -311,6 +332,12 @@ function connectToServer(playerName: string) {
       console.log('Player left:', data.id)
       removeOtherPlayer(data.id)
     }
+
+    if (data.type === 'player:update') {
+      if (data.id !== myPlayerId) {
+        updateOtherPlayer(data.id, data.position, data.rotation)
+      }
+    }
   };
 
   ws.onerror = (error) => {
@@ -347,6 +374,21 @@ function removeOtherPlayer(playerId: string) {
   }
 }
 
+function updateOtherPlayer(
+  playerId: string,
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  },
+  rotation: number
+) {
+  const playerCube = otherPlayers.get(playerId);
+  if(playerCube) {
+    playerCube.position.set(position.x, position.y, position.z);
+    playerCube.rotation.y = rotation;
+  }
+}
 
 // GAME LOOP
 function animate() {
