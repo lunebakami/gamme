@@ -23,7 +23,9 @@ export interface ClientToServerEvents {
   'player:move': {
     position: { x: number; y: number; z: number };
     rotation: number;
-  }
+  },
+  'player:wave': {};
+  'chat:message': { message: string };
 }
 
 export interface ServerToClientEvents {
@@ -38,6 +40,8 @@ export interface ServerToClientEvents {
       z: number;
     },
     rotation: number;
+  'player:waved': { id: string };
+  'chat:message': { playerId: string; playerName: string; message: string };
   }
 }
 

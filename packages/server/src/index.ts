@@ -33,7 +33,9 @@ const app = new Elysia()
         ws.send(JSON.stringify({
           type: 'game:init',
           players: Array.from(players.values()),
-          yourId: playerId
+          yourId: playerId,
+          name: data.name,
+          score: 0,
         }))
 
         // Broadcast the new player's state to all other players
@@ -58,6 +60,28 @@ const app = new Elysia()
             position: data.position,
             rotation: data.rotation,
           }))
+        }
+      }
+
+      if (data.type === 'player:wave') {
+        const playerId = ws.id as string;
+        ws.publish('game', JSON.stringify({
+          type: 'player:waved',
+          id: playerId,
+        }));
+      }
+
+      if (data.type === 'chat:message') {
+        const playerId = ws.id as string;
+        const player = players.get(playerId);
+
+        if (player) {
+          ws.publish('game', JSON.stringify({
+            type: 'chat:message',
+            playerId: playerId,
+            playerName: player.name,
+            message: data.message,
+          }));
         }
       }
     },
