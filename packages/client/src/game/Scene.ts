@@ -9,6 +9,13 @@ let renderer: THREE.WebGLRenderer;
 let labelRenderer: CSS2DRenderer;
 let myPlayer: THREE.Group | null = null;
 let myLabel: CSS2DObject | null = null;
+let myMixer: THREE.AnimationMixer | null = null;
+let playerAnimations = new Map<string, THREE.AnimationAction>();
+const clock = new THREE.Clock();
+let isJumping = false;
+let velocityY = 0;
+const gravity = -0.009;   // tweak this
+const jumpStrength = 0.18; // tweak this
 
 const otherPlayers = new Map<string, THREE.Group>();
 const playerLabels = new Map<string, CSS2DObject>();
@@ -115,7 +122,35 @@ function createGround() {
 }
 
 async function createMyPlayer(playerData: { name: string; avatar: any }) {
-  myPlayer = await createPlayerCharacter(playerData.avatar.color, playerData.avatar.body);
+  const { object, mixer, animations } = await createPlayerCharacter(playerData.avatar.color, playerData.avatar.body);
+  console.log({
+    animations
+  })
+  myPlayer = object;
+  myMixer = mixer;
+
+  let idleAction, walkAction, jumpAction, waveAction, duckAction;
+
+  idleAction = myMixer?.clipAction(animations.find(a => a.name === "Idle")!);
+  walkAction = myMixer?.clipAction(animations.find(a => a.name === "Run")!);
+  jumpAction = myMixer?.clipAction(animations.find(a => a.name === "Jump")!)!;
+  jumpAction.setLoop(THREE.LoopOnce, 1);
+  jumpAction.clampWhenFinished = true;
+  waveAction = myMixer?.clipAction(animations.find(a => a.name === "Wave")!);
+  duckAction = myMixer?.clipAction(animations.find(a => a.name === "Duck")!);
+
+  playerAnimations.set('idle', idleAction!);
+  playerAnimations.set('walk', walkAction!);
+  playerAnimations.set('jump', jumpAction!);
+  playerAnimations.set('wave', waveAction!);
+  playerAnimations.set('duck', duckAction!);
+
+  // play first animation if exists
+  if (mixer && animations.length > 0) {
+    const action = mixer.clipAction(animations[9]!);
+    action.play();
+  }
+
   myPlayer.position.set(0, 0, 0);
   scene.add(myPlayer);
 
@@ -156,28 +191,90 @@ function setupControls() {
   window.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
   });
+
+  window.addEventListener("keydown", (e) => {
+    keys[e.key.toLowerCase()] = true;
+
+    if (e.key === " " || e.key === "Space") {
+      tryJump();
+    }
+  });
+}
+
+function tryJump() {
+  if (!myPlayer || isJumping) return;
+
+  isJumping = true;
+  velocityY = jumpStrength;
+
+  // Stop all other animations
+  playerAnimations.get('walk')?.stop();
+  playerAnimations.get('idle')?.stop();
+
+  const jump = playerAnimations.get('jump');
+  jump?.reset();  // start from frame 0
+  jump?.play();
 }
 
 function updateMovement() {
   if (!myPlayer) return;
 
   let moved = false;
+  const direction = new THREE.Vector3();
 
-  if (keys['w'] || keys['arrowup']) {
-    myPlayer.position.z -= moveSpeed;
-    moved = true;
+  if (keys['w'] || keys['arrowup']) direction.z -= 1;
+  if (keys['s'] || keys['arrowdown']) direction.z += 1;
+  if (keys['a'] || keys['arrowleft']) direction.x -= 1;
+  if (keys['d'] || keys['arrowright']) direction.x += 1;
+
+  if (direction.lengthSq() > 0) {
+     moved = true;
+
+     // normalize so diagonal is not faster
+     direction.normalize();
+
+     // 🟩 rotate to face movement
+     const target = new THREE.Vector3(
+         myPlayer.position.x + direction.x,
+         myPlayer.position.y,
+         myPlayer.position.z + direction.z
+     );
+
+     const quaternion = new THREE.Quaternion();
+     const currentQuat = myPlayer.quaternion.clone();
+
+     myPlayer.lookAt(target);               // sets the correct facing rotation
+     quaternion.copy(myPlayer.quaternion);  // save the target rotation
+     myPlayer.quaternion.copy(currentQuat); // restore original
+     myPlayer.quaternion.slerp(quaternion, 0.2); // smooth rotate
+
+
+     // 🟦 move forward based on direction
+     myPlayer.position.x += direction.x * moveSpeed;
+     myPlayer.position.z += direction.z * moveSpeed;
   }
-  if (keys['s'] || keys['arrowdown']) {
-    myPlayer.position.z += moveSpeed;
-    moved = true;
+
+  if (isJumping) {
+     playerAnimations.get('idle')?.stop();
+     playerAnimations.get('jump')?.play();
+     velocityY += gravity;
+     myPlayer.position.y += velocityY;
+
+     // Ground check
+     if (myPlayer.position.y <= 0) {
+       myPlayer.position.y = 0;
+       playerAnimations.get('jump')?.stop();
+       isJumping = false;
+       velocityY = 0;
+     }
   }
-  if (keys['a'] || keys['arrowleft']) {
-    myPlayer.position.x -= moveSpeed;
-    moved = true;
-  }
-  if (keys['d'] || keys['arrowright']) {
-    myPlayer.position.x += moveSpeed;
-    moved = true;
+
+  if (moved) {
+    playerAnimations.get('walk')?.play();
+    playerAnimations.get('idle')?.stop();
+  } else {
+    playerAnimations.get('idle')?.play();
+    playerAnimations.get('walk')?.stop();
   }
 
   // Keep player within bounds
@@ -200,6 +297,9 @@ function updateMovement() {
 
 function animate() {
   requestAnimationFrame(animate);
+
+  const dt = clock.getDelta();
+  if (myMixer) myMixer.update(dt);
 
   updateMovement();
 

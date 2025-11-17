@@ -3,38 +3,54 @@ import { GLTFLoader } from 'three-stdlib';
 
 const gltfLoader = new GLTFLoader();
 
-const loadGLTFModel = (modelPath: string) => {
-  const obj3d = new THREE.Object3D();
-  gltfLoader.load(modelPath, (gltf) => {
-      console.log("Animations:", gltf.animations);
-    const model = gltf.scene;
-    model.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
+export function loadGLTFModel(modelPath: string): Promise<{ model: THREE.Group, animations: THREE.AnimationClip[] }> {
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(
+      modelPath,
+      (gltf) => {
+        gltf.scene.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
 
-    obj3d.add(model);
-    return model
-  }, undefined, console.error);
-
-  return obj3d
+        resolve({
+          model: gltf.scene,
+          animations: gltf.animations
+        });
+      },
+      undefined,
+      (error) => reject(error)
+    );
+  });
 }
 
-export async function createPlayerCharacter(color: string, bodyType: string): Promise<THREE.Group> {
+export async function createPlayerCharacter(color: string, bodyType: string) {
   const character = new THREE.Group();
 
   if (bodyType === 'cube') {
     const cube = createCubeCharacter(parseInt(color.replace('#', '0x')));
     character.add(cube);
-    return character;
+    return {
+      object: character,
+      mixer: null,
+      animations: []
+    };
   }
 
   try {
     const modelPath = `/src/assets/${bodyType}.gltf`;
-    const model = loadGLTFModel(modelPath);
+    const { model, animations } = await loadGLTFModel(modelPath);
+    const mixer = new THREE.AnimationMixer(model);
     character.add(model);
+    character.castShadow = true;
+    character.receiveShadow = true;
+    return {
+      object: character,
+      mixer,
+      animations
+    };
   } catch (error) {
     console.error(`Failed to load model ${bodyType}:`, error);
     // Fallback to cube if model fails to load
@@ -42,10 +58,7 @@ export async function createPlayerCharacter(color: string, bodyType: string): Pr
     character.add(fallback);
   }
 
-  character.castShadow = true;
-  character.receiveShadow = true;
-
-  return character;
+  return { object: character, mixer: null, animations: [] };
 }
 
 function createCubeCharacter(color: number): THREE.Group {
