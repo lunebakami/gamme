@@ -40,7 +40,7 @@ export async function createPlayerCharacter(color: string, bodyType: string) {
   }
 
   try {
-    const modelPath = `/src/assets/${bodyType}.gltf`;
+    const modelPath = `/assets/${bodyType}.gltf`;
     const { model, animations } = await loadGLTFModel(modelPath);
     const mixer = new THREE.AnimationMixer(model);
     character.add(model);
