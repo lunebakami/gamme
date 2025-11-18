@@ -16,7 +16,7 @@ export interface PlayerState {
 export const GAME_CONFIG = {
   TICK_RATE: 60,
   MAX_PLAYERS: 4,
-  SERVER_URL: 'ws://localhost:3000',
+  SERVER_URL: Bun.env.SERVER_URL || 'ws://localhost:3000',
   UPDATE_RATE: 50,
 } as const;
 
