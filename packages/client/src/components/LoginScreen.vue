@@ -27,7 +27,7 @@ async function loadPreviewModel(modelName: string) {
 
   try {
     const gltf = await new Promise<any>((resolve, reject) => {
-      gltfLoader.load(`/src/assets/${modelName}.gltf`, resolve, undefined, reject);
+      gltfLoader.load(`/assets/${modelName}.gltf`, resolve, undefined, reject);
     });
 
     const model = gltf.scene;
