@@ -77,14 +77,22 @@ const app = new Elysia()
         const player = players.get(playerId);
 
         if (player) {
-          ws.publish('game', JSON.stringify({
+          // Broadcast to ALL players including sender
+          const chatData = JSON.stringify({
             type: 'chat:message',
             playerId: playerId,
             playerName: player.name,
             message: data.message,
-          }));
+          });
+
+          ws.publish('game', chatData);
+          // Also send to sender
+          ws.send(chatData);
+
+          console.log(`${player.name}: ${data.message}`);
         }
       }
+
     },
     close(ws) {
       const playerId = ws.id;

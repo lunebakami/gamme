@@ -6,6 +6,9 @@ let myPlayerId: string | null = null;
 let lastPositionSent = 0;
 const POSITION_UPDATE_INTERVAL = 50; // Send updates every 100ms
 
+// Chat message callback
+let chatMessageCallback: ((data: any) => void) | null = null;
+
 export function connectToServer(playerName: string, avatar: any) {
   ws = new WebSocket(GAME_CONFIG.SERVER_URL + '/game');
 
@@ -51,6 +54,13 @@ export function connectToServer(playerName: string, avatar: any) {
         updateOtherPlayer(data.id, data.position, data.isMoving || false);
       }
     }
+
+    if (data.type === 'chat:message') {
+      console.log('Chat message received:', data);
+      if (chatMessageCallback) {
+        chatMessageCallback(data);
+      }
+    }
   };
 
   ws.onerror = (error) => {
@@ -90,4 +100,8 @@ export function sendChatMessage(message: string) {
       message: message,
     }));
   }
+}
+
+export function onChatMessage(callback: (data: any) => void) {
+  chatMessageCallback = callback;
 }
