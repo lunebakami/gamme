@@ -9,7 +9,7 @@ const POSITION_UPDATE_INTERVAL = 50; // Send updates every 100ms
 let chatMessageCallback: ((data: any) => void) | null = null;
 
 export function connectToServer(playerName: string, avatar: any) {
-  const url = import.meta.env.SERVER_URL;
+  const url = import.meta.env.VITE_SERVER_URL;
   ws = new WebSocket(url + '/game');
 
   ws.onopen = () => {
