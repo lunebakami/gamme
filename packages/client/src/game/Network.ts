@@ -4,7 +4,7 @@ import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer } from './Scene'
 let ws: WebSocket | null = null;
 let myPlayerId: string | null = null;
 let lastPositionSent = 0;
-const POSITION_UPDATE_INTERVAL = 100; // Send updates every 100ms
+const POSITION_UPDATE_INTERVAL = 50; // Send updates every 100ms
 
 export function connectToServer(playerName: string, avatar: any) {
   ws = new WebSocket(GAME_CONFIG.SERVER_URL + '/game');
@@ -48,7 +48,7 @@ export function connectToServer(playerName: string, avatar: any) {
 
     if (data.type === 'player:update') {
       if (data.id !== myPlayerId) {
-        updateOtherPlayer(data.id, data.position);
+        updateOtherPlayer(data.id, data.position, data.isMoving || false);
       }
     }
   };
@@ -62,13 +62,14 @@ export function connectToServer(playerName: string, avatar: any) {
   };
 }
 
-export function sendMovement(position: { x: number; y: number; z: number }) {
+export function sendMovement(position: { x: number; y: number; z: number }, isMoving: boolean = true) {
   const now = Date.now();
   if (ws && ws.readyState === WebSocket.OPEN && now - lastPositionSent > POSITION_UPDATE_INTERVAL) {
     ws.send(JSON.stringify({
       type: 'player:move',
       position: position,
       rotation: 0,
+      isMoving: isMoving, // NEW: Send movement state
     }));
     lastPositionSent = now;
   }

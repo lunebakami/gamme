@@ -1,3 +1,8 @@
+export interface Avatar {
+  color: string;
+  body: string;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
@@ -5,6 +10,7 @@ export interface PlayerState {
   rotation: number;
   score: number;
   isAlive: boolean;
+  avatar: Avatar;
 };
 
 export const GAME_CONFIG = {
@@ -19,10 +25,11 @@ export interface GameState {
 }
 
 export interface ClientToServerEvents {
-  'player:join': { name: string },
+  'player:join': { name: string, avatar: Avatar },
   'player:move': {
     position: { x: number; y: number; z: number };
     rotation: number;
+    isMoving?: boolean; // NEW: Optional movement state
   },
   'player:wave': {};
   'chat:message': { message: string };
@@ -40,6 +47,7 @@ export interface ServerToClientEvents {
       z: number;
     },
     rotation: number;
+    isMoving?: boolean; // NEW: Optional movement state
   'player:waved': { id: string };
   'chat:message': { playerId: string; playerName: string; message: string };
   }

@@ -19,6 +19,8 @@ const jumpStrength = 0.18; // tweak this
 
 const otherPlayers = new Map<string, THREE.Group>();
 const playerLabels = new Map<string, CSS2DObject>();
+const otherPlayerMixers = new Map<string, THREE.AnimationMixer>(); // NEW
+const otherPlayerAnimations = new Map<string, Map<string, THREE.AnimationAction>>(); // NEW
 
 // Movement state
 const keys: { [key: string]: boolean } = {};
@@ -286,20 +288,27 @@ function updateMovement() {
     myPlayer.position.z = Math.sin(angle) * maxDistance;
   }
 
-  if (moved) {
-    sendMovement({
-      x: myPlayer.position.x,
-      y: myPlayer.position.y,
-      z: myPlayer.position.z,
-    });
-  }
+  // CHANGE: Always send position updates (even when stopped)
+  // This way other players know when you stop moving
+  sendMovement({
+    x: myPlayer.position.x,
+    y: myPlayer.position.y,
+    z: myPlayer.position.z,
+  }, moved); // Pass the 'moved' state
 }
 
 function animate() {
   requestAnimationFrame(animate);
 
   const dt = clock.getDelta();
+
+  // Update my player's mixer
   if (myMixer) myMixer.update(dt);
+
+  // Update all other players' mixers
+  otherPlayerMixers.forEach((mixer) => {
+    mixer.update(dt);
+  });
 
   updateMovement();
 
@@ -317,10 +326,16 @@ function animate() {
 
 // Export functions for network to use
 export async function spawnOtherPlayer(player: any) {
-  const playerModel = await createPlayerCharacter(
-    player.avatar?.color || '#0000ff',
-    player.avatar?.body || 'cube'
-  );
+  console.log('spawnOtherPlayer called with:', player);
+
+  const color = player.avatar?.color || '#0000ff';
+  const body = player.avatar?.body || 'cube';
+
+  console.log('Creating player with color:', color, 'body:', body);
+
+  const { object, mixer, animations } = await createPlayerCharacter(color, body);
+
+  const playerModel = object;
 
   playerModel.position.set(
     player.position.x,
@@ -331,11 +346,40 @@ export async function spawnOtherPlayer(player: any) {
   scene.add(playerModel);
   otherPlayers.set(player.id, playerModel);
 
+  // Setup animations for other player
+  if (mixer && animations.length > 0) {
+    otherPlayerMixers.set(player.id, mixer);
+
+    const animMap = new Map<string, THREE.AnimationAction>();
+
+    const idleAnim = animations.find(a => a.name === "Idle");
+    const walkAnim = animations.find(a => a.name === "Run");
+    const jumpAnim = animations.find(a => a.name === "Jump");
+    const waveAnim = animations.find(a => a.name === "Wave");
+    const duckAnim = animations.find(a => a.name === "Duck");
+
+    if (idleAnim) animMap.set('idle', mixer.clipAction(idleAnim));
+    if (walkAnim) animMap.set('walk', mixer.clipAction(walkAnim));
+    if (jumpAnim) {
+      const action = mixer.clipAction(jumpAnim);
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      animMap.set('jump', action);
+    }
+    if (waveAnim) animMap.set('wave', mixer.clipAction(waveAnim));
+    if (duckAnim) animMap.set('duck', mixer.clipAction(duckAnim));
+
+    otherPlayerAnimations.set(player.id, animMap);
+
+    // Play idle animation by default
+    animMap.get('idle')?.play();
+  }
+
   const label = createNameLabel(player.name, player.score || 0);
   playerModel.add(label);
   playerLabels.set(player.id, label);
 
-  console.log('Spawned player:', player.name);
+  console.log('Spawned player:', player.name, 'with body type:', body);
 }
 
 export function removeOtherPlayer(playerId: string) {
@@ -349,11 +393,57 @@ export function removeOtherPlayer(playerId: string) {
   if (label) {
     playerLabels.delete(playerId);
   }
-}
 
-export function updateOtherPlayer(playerId: string, position: any) {
+  // Clean up mixer and animations
+  otherPlayerMixers.delete(playerId);
+  otherPlayerAnimations.delete(playerId);
+}
+// Track previous positions for movement detection
+const otherPlayerPrevPositions = new Map<string, THREE.Vector3>();
+
+export function updateOtherPlayer(playerId: string, position: any, isMoving: boolean = false) {
   const playerModel = otherPlayers.get(playerId);
-  if (playerModel) {
-    playerModel.position.set(position.x, position.y, position.z);
+  if (!playerModel) return;
+
+  // Get previous position
+  const prevPos = otherPlayerPrevPositions.get(playerId) || playerModel.position.clone();
+  
+  // Calculate movement
+  const newPos = new THREE.Vector3(position.x, position.y, position.z);
+  const movement = newPos.clone().sub(prevPos);
+
+  // Smooth interpolation
+  playerModel.position.lerp(newPos, 0.3);
+
+  // Rotate to face movement direction (only if moving)
+  if (isMoving && (movement.x !== 0 || movement.z !== 0)) {
+    const target = new THREE.Vector3(
+      playerModel.position.x + movement.x,
+      playerModel.position.y,
+      playerModel.position.z + movement.z
+    );
+    
+    const quaternion = new THREE.Quaternion();
+    const currentQuat = playerModel.quaternion.clone();
+    
+    playerModel.lookAt(target);
+    quaternion.copy(playerModel.quaternion);
+    playerModel.quaternion.copy(currentQuat);
+    playerModel.quaternion.slerp(quaternion, 0.2);
   }
+
+  // Handle animations using the isMoving flag from server
+  const animMap = otherPlayerAnimations.get(playerId);
+  if (animMap) {
+    if (isMoving) {
+      animMap.get('idle')?.stop();
+      animMap.get('walk')?.play();
+    } else {
+      animMap.get('walk')?.stop();
+      animMap.get('idle')?.play();
+    }
+  }
+
+  // Store current position for next frame
+  otherPlayerPrevPositions.set(playerId, playerModel.position.clone());
 }

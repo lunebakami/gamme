@@ -20,11 +20,11 @@ const app = new Elysia()
           position: { x: 0, y: 0.5, z: 0 },
           rotation: 0,
           score: 0,
-          isAlive: true
+          isAlive: true,
+          avatar: data.avatar,
         };
 
         players.set(playerId, newPlayer);
-
 
         // Subscribe this connection to game channel
         ws.subscribe('game')
@@ -59,6 +59,7 @@ const app = new Elysia()
             id: playerId,
             position: data.position,
             rotation: data.rotation,
+            isMoving: data.isMoving, // NEW: Broadcast movement state
           }))
         }
       }
