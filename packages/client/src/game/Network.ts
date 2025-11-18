@@ -1,4 +1,3 @@
-import { GAME_CONFIG } from '@gamme/shared';
 import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer, otherPlayerWaves } from './Scene';
 
 let ws: WebSocket | null = null;
@@ -10,7 +9,8 @@ const POSITION_UPDATE_INTERVAL = 50; // Send updates every 100ms
 let chatMessageCallback: ((data: any) => void) | null = null;
 
 export function connectToServer(playerName: string, avatar: any) {
-  ws = new WebSocket(GAME_CONFIG.SERVER_URL + '/game');
+  const url = import.meta.env.SERVER_URL;
+  ws = new WebSocket(url + '/game');
 
   ws.onopen = () => {
     console.log('Connected to server');
