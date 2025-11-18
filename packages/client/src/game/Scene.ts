@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three-stdlib';
 import { createPlayerCharacter } from './Player';
-import { connectToServer, sendMovement } from './Network';
+import { connectToServer, sendMovement, sendWave } from './Network';
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -13,6 +13,7 @@ let myMixer: THREE.AnimationMixer | null = null;
 let playerAnimations = new Map<string, THREE.AnimationAction>();
 const clock = new THREE.Clock();
 let isJumping = false;
+let isWaving = false;
 let velocityY = 0;
 const gravity = -0.009;   // tweak this
 const jumpStrength = 0.18; // tweak this
@@ -138,7 +139,9 @@ async function createMyPlayer(playerData: { name: string; avatar: any }) {
   jumpAction = myMixer?.clipAction(animations.find(a => a.name === "Jump")!)!;
   jumpAction.setLoop(THREE.LoopOnce, 1);
   jumpAction.clampWhenFinished = true;
-  waveAction = myMixer?.clipAction(animations.find(a => a.name === "Wave")!);
+  waveAction = myMixer?.clipAction(animations.find(a => a.name === "Wave")!)!;
+  waveAction.setLoop(THREE.LoopOnce, 1);
+  waveAction.clampWhenFinished = true;
   duckAction = myMixer?.clipAction(animations.find(a => a.name === "Duck")!);
 
   playerAnimations.set('idle', idleAction!);
@@ -199,6 +202,8 @@ function setupControls() {
 
     if (e.key === " " || e.key === "Space") {
       tryJump();
+    } else if (e.key === "e") {
+      tryWave();
     }
   });
 }
@@ -216,6 +221,18 @@ function tryJump() {
   const jump = playerAnimations.get('jump');
   jump?.reset();  // start from frame 0
   jump?.play();
+}
+
+function tryWave() {
+  if (!myPlayer || isWaving) return;
+
+  isWaving = true;
+  sendWave()
+
+  playerAnimations.get('idle')?.stop();
+  const wave = playerAnimations.get('wave');
+  wave?.reset();
+  wave?.play();
 }
 
 function updateMovement() {
@@ -269,6 +286,11 @@ function updateMovement() {
        isJumping = false;
        velocityY = 0;
      }
+  }
+
+  const isWaveAnimRunning = playerAnimations.get('wave')!.isRunning();
+  if (isWaving && !isWaveAnimRunning) {
+    isWaving = false;
   }
 
   if (moved) {
@@ -366,7 +388,12 @@ export async function spawnOtherPlayer(player: any) {
       action.clampWhenFinished = true;
       animMap.set('jump', action);
     }
-    if (waveAnim) animMap.set('wave', mixer.clipAction(waveAnim));
+    if (waveAnim) {
+      const action = mixer.clipAction(waveAnim);
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+      animMap.set('wave', action);
+    }
     if (duckAnim) animMap.set('duck', mixer.clipAction(duckAnim));
 
     otherPlayerAnimations.set(player.id, animMap);
@@ -407,7 +434,7 @@ export function updateOtherPlayer(playerId: string, position: any, isMoving: boo
 
   // Get previous position
   const prevPos = otherPlayerPrevPositions.get(playerId) || playerModel.position.clone();
-  
+
   // Calculate movement
   const newPos = new THREE.Vector3(position.x, position.y, position.z);
   const movement = newPos.clone().sub(prevPos);
@@ -422,10 +449,10 @@ export function updateOtherPlayer(playerId: string, position: any, isMoving: boo
       playerModel.position.y,
       playerModel.position.z + movement.z
     );
-    
+
     const quaternion = new THREE.Quaternion();
     const currentQuat = playerModel.quaternion.clone();
-    
+
     playerModel.lookAt(target);
     quaternion.copy(playerModel.quaternion);
     playerModel.quaternion.copy(currentQuat);
@@ -446,4 +473,12 @@ export function updateOtherPlayer(playerId: string, position: any, isMoving: boo
 
   // Store current position for next frame
   otherPlayerPrevPositions.set(playerId, playerModel.position.clone());
+}
+
+export function otherPlayerWaves(playerId:string) {
+  const animMap = otherPlayerAnimations.get(playerId);
+  if (animMap) {
+      animMap.get('wave')?.reset();
+      animMap.get('wave')?.play();
+  }
 }

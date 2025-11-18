@@ -1,5 +1,5 @@
 import { GAME_CONFIG } from '@gamme/shared';
-import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer } from './Scene';
+import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer, otherPlayerWaves } from './Scene';
 
 let ws: WebSocket | null = null;
 let myPlayerId: string | null = null;
@@ -59,6 +59,12 @@ export function connectToServer(playerName: string, avatar: any) {
       console.log('Chat message received:', data);
       if (chatMessageCallback) {
         chatMessageCallback(data);
+      }
+    }
+
+    if (data.type === 'player:waved') {
+      if (data.id !== myPlayerId) {
+        otherPlayerWaves(data.id)
       }
     }
   };
