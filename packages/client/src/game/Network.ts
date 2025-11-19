@@ -1,7 +1,7 @@
-import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer, otherPlayerWaves, setMyPlayerPosition } from './Scene';
+import { spawnOtherPlayer, removeOtherPlayer, updateOtherPlayer, otherPlayerWaves, setMyPlayerPosition, otherPlayerWishesBirthday, resetBirthday } from './Scene';
 
 let ws: WebSocket | null = null;
-let myPlayerId: string | null = null;
+export let myPlayerId: string | null = null;
 let mySessionId: string | null = null;
 let lastPositionSent = 0;
 const POSITION_UPDATE_INTERVAL = 50; // Send updates every 100ms
@@ -92,7 +92,7 @@ export function connectToServer(playerName: string, avatar: any) {
       mySessionId = data.sessionId;
 
       // Salvar sessão
-      saveSession(data.sessionId, { name: playerName, avatar });
+      saveSession(data.sessionId, { name: playerName, avatar, id: myPlayerId });
       console.log('My player ID:', myPlayerId);
       console.log('Current players:', data.players);
 
@@ -107,6 +107,16 @@ export function connectToServer(playerName: string, avatar: any) {
       const player = data.player;
       if (player.id !== myPlayerId) {
         console.log('Player joined:', player.name);
+        spawnOtherPlayer(player);
+      }
+    }
+
+    if (data.type === 'player:reconnected') {
+      const player = data.player;
+      const oldConnectionId = data.oldConnectionId
+      removeOtherPlayer(oldConnectionId);
+      if (player.id !== myPlayerId) {
+        console.log('Player reconnected:', player.name);
         spawnOtherPlayer(player);
       }
     }
@@ -139,6 +149,14 @@ export function connectToServer(playerName: string, avatar: any) {
     window.addEventListener('beforeunload', (e) => {
       // Não fazer nada - deixar a sessão salva para reconexão
     });
+
+    if (data.type === 'player:birthday') {
+      if (data.id !== myPlayerId) {
+        otherPlayerWishesBirthday(data.id);
+      } else {
+        resetBirthday();
+      }
+    }
   };
 
   ws.onerror = (error) => {
@@ -182,4 +200,12 @@ export function sendChatMessage(message: string) {
 
 export function onChatMessage(callback: (data: any) => void) {
   chatMessageCallback = callback;
+}
+
+export function sendHappyBirthday() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'player:birthday',
+    }));
+  }
 }

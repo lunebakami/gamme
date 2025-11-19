@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three-stdlib';
 import { createPlayerCharacter } from './Player';
-import { connectToServer, sendMovement, sendWave } from './Network';
+import { connectToServer, myPlayerId, sendHappyBirthday, sendMovement, sendWave } from './Network';
 import { createBirthdayBanner } from './Banner';
+import { showBubbleForPlayer } from './TextBubble';
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -14,8 +15,11 @@ let myLabel: CSS2DObject | null = null;
 let myMixer: THREE.AnimationMixer | null = null;
 let playerAnimations = new Map<string, THREE.AnimationAction>();
 const clock = new THREE.Clock();
+
+// Player State
 let isJumping = false;
 let isWaving = false;
+let saidHappyBirthday = false;
 let velocityY = 0;
 const gravity = -0.009;   // tweak this
 const jumpStrength = 0.18; // tweak this
@@ -187,7 +191,7 @@ function createNameLabel(name: string, score: number): CSS2DObject {
   labelDiv.textContent = `${name}`;
 
   const label = new CSS2DObject(labelDiv);
-  label.position.set(0, 2, 0);
+  label.position.set(0, 4, 0);
 
   return label;
 }
@@ -208,6 +212,8 @@ function setupControls() {
       tryJump();
     } else if (e.key === "e") {
       tryWave();
+    } else if (e.key === "f") {
+      tryHappyBirthday();
     }
   });
 }
@@ -237,6 +243,15 @@ function tryWave() {
   const wave = playerAnimations.get('wave');
   wave?.reset();
   wave?.play();
+}
+
+function tryHappyBirthday() {
+  if (!myPlayerId || !myPlayer || saidHappyBirthday) return;
+
+  saidHappyBirthday = true;
+  showBubbleForPlayer(myPlayerId!, 'Happy Birthday!', myPlayer);
+  sendHappyBirthday();
+  tryWave();
 }
 
 export function setMyPlayerPosition(position: { x: number; y: number; z: number }) {
@@ -422,19 +437,22 @@ export async function spawnOtherPlayer(player: any) {
   playerModel.add(label);
   playerLabels.set(player.id, label);
 
-  console.log('Spawned player:', player.name, 'with body type:', body);
+  console.log('Spawned player:', player.name, 'with body type:', body, scene);
 }
 
 export function removeOtherPlayer(playerId: string) {
   const playerModel = otherPlayers.get(playerId);
   if (playerModel) {
+    const label = playerLabels.get(playerId);
+    if (label) {
+      playerModel.remove(label);
+      if (label.parent) {
+        label.parent.remove(label);
+      }
+      playerLabels.delete(playerId);
+    }
     scene.remove(playerModel);
     otherPlayers.delete(playerId);
-  }
-
-  const label = playerLabels.get(playerId);
-  if (label) {
-    playerLabels.delete(playerId);
   }
 
   // Clean up mixer and animations
@@ -497,4 +515,15 @@ export function otherPlayerWaves(playerId:string) {
       animMap.get('wave')?.reset();
       animMap.get('wave')?.play();
   }
+}
+
+export function otherPlayerWishesBirthday(playerId: string) {
+  const playerModel = otherPlayers.get(playerId);
+  if (!playerModel) return;
+
+  showBubbleForPlayer(playerId, 'Feliz Aniversário Joyce!!!', playerModel);
+}
+
+export function resetBirthday() {
+  saidHappyBirthday = false;
 }

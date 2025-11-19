@@ -22,11 +22,6 @@ const app = new Elysia()
         const sessionId = data.sessionId;
         const oldConnectionId = sessions.get(sessionId);
 
-        console.log({
-          sessionId,
-          sessions
-        })
-
         if (oldConnectionId) {
           // Encontrar o jogador antigo
           const oldPlayer = players.get(oldConnectionId);
@@ -70,8 +65,9 @@ const app = new Elysia()
 
             // Notificar outros jogadores
             ws.publish('game', JSON.stringify({
-              type: 'player:joined',
+              type: 'player:reconnected',
               player: reconnectedPlayer,
+              oldConnectionId,
             }));
 
             console.log(`Player ${data.name} reconnected with session ${sessionId}`);
@@ -172,6 +168,22 @@ const app = new Elysia()
         }
       }
 
+      if (data.type === 'player:birthday') {
+        const playerId = ws.id as string;
+        const player = players.get(playerId);
+
+        if (player) {
+          // Broadcast to ALL players including sender
+          const birthdayData = JSON.stringify({
+            type: 'player:birthday',
+            id: playerId,
+          });
+
+          ws.publish('game', birthdayData);
+          // Also send to sender
+          ws.send(birthdayData);
+        }
+      }
     },
     close(ws) {
       const playerId = ws.id;

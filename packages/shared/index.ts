@@ -34,12 +34,14 @@ export interface ClientToServerEvents {
     isMoving?: boolean; // NEW: Optional movement state
   },
   'player:wave': {};
+  'player:birthday': {};
   'chat:message': { message: string };
 }
 
 export interface ServerToClientEvents {
   'game:init': { players: PlayerState[]; yourId: string; sessionId: string }; // ATUALIZADO
   'player:joined': PlayerState,
+  'player:reconnected': PlayerState,
   'player:left': { id: string },
   'player:update': {
     id: string,
@@ -51,6 +53,7 @@ export interface ServerToClientEvents {
     rotation: number;
     isMoving?: boolean; // NEW: Optional movement state
   'player:waved': { id: string };
+  'player:birthday': { id: string };
   'chat:message': { playerId: string; playerName: string; message: string };
   'reconnect:success': { yourId: string; position: any }; // NOVO
   'reconnect:failed': {}; // NOVO
