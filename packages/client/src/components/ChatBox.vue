@@ -13,7 +13,39 @@ const messageInput = ref('');
 const chatMessagesEl = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-  // Listen for incoming chat messages
+  const btn = document.getElementById("mobile-chat-toggle");
+  const box = document.querySelector(".chat-box") as HTMLElement;
+  const overlay = document.getElementById("chat-overlay");
+
+  if (btn && box && overlay) {
+
+    // Função de abrir/fechar
+    const toggleChat = () => {
+      const isOpen = box.classList.toggle("open");
+      overlay.classList.toggle("open", isOpen);
+
+      if (isOpen) {
+        nextTick(() => {
+          const input = box.querySelector("input") as HTMLInputElement;
+          input?.focus();
+        });
+      }
+    };
+
+    // Botão abre/fecha o chat
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleChat();
+    });
+
+    // Clicar no overlay → fecha o chat
+    overlay.addEventListener("click", () => {
+      box.classList.remove("open");
+      overlay.classList.remove("open");
+    });
+  }
+
+  // Seu listener de mensagens permanece
   onChatMessage((data) => {
     messages.value.push({
       playerId: data.playerId,
@@ -21,14 +53,15 @@ onMounted(() => {
       text: data.message,
     });
 
-    // Auto-scroll to bottom
     nextTick(() => {
       if (chatMessagesEl.value) {
-        chatMessagesEl.value.scrollTop = chatMessagesEl.value.scrollHeight;
+        chatMessagesEl.value.scrollTop =
+          chatMessagesEl.value.scrollHeight;
       }
     });
   });
 });
+
 
 const sendMessage = () => {
   if (messageInput.value.trim()) {
@@ -63,6 +96,9 @@ const sendMessage = () => {
       <button @click="sendMessage">Send</button>
     </div>
   </div>
+
+  <!-- Overlay para bloquear toques quando o chat está aberto -->
+  <div id="chat-overlay" class="chat-overlay"></div>
 </template>
 
 <style scoped>
@@ -187,6 +223,65 @@ const sendMessage = () => {
   .chat-box {
     width: calc(100% - 40px);
     height: 250px;
+  }
+}
+
+/* Botão flutuante do chat (somente mobile) */
+.mobile-chat-btn {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  font-size: 26px;
+  border: none;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  display: none; /* escondido no desktop */
+  z-index: 9999;
+  backdrop-filter: blur(5px);
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .mobile-chat-btn {
+    display: block;
+  }
+
+  .chat-box {
+    display: none; /* escondido por padrão */
+    position: fixed;
+    left: 20px;
+    right: 20px;
+    bottom: 100px;
+  }
+
+  .chat-box.open {
+    display: flex; /* aparece ao abrir */
+  }
+}
+/* Overlay que bloqueia interações quando o chat está aberto */
+.chat-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0); /* transparente */
+  display: none;
+  z-index: 9998; /* abaixo do chat, acima do resto */
+}
+
+/* MOBILE ONLY */
+@media (max-width: 768px) {
+  .chat-overlay.open {
+    display: block;
+  }
+
+  .chat-box {
+    z-index: 9999; /* chat acima do overlay */
+  }
+
+  .mobile-chat-btn {
+    z-index: 10000; /* botão do chat sempre no topo */
   }
 }
 </style>

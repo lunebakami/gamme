@@ -4,6 +4,7 @@ import { createPlayerCharacter } from './Player';
 import { connectToServer, myPlayerId, sendHappyBirthday, sendMovement, sendWave } from './Network';
 import { createBirthdayBanner } from './Banner';
 import { showBubbleForPlayer } from './TextBubble';
+import { joyMove, setupMoveJoystick } from './MobileUI';
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -34,6 +35,15 @@ const keys: { [key: string]: boolean } = {};
 const moveSpeed = 0.1;
 
 export async function initGame(playerData: { name: string; avatar: any }) {
+  const chatBtn = document.getElementById("mobile-chat-toggle");
+  const chat = document.getElementById("chat-container");
+
+  chatBtn?.addEventListener("click", () => {
+    if (!chat) return;
+
+    chat.classList.toggle("open");
+  });
+
   setupScene();
   setupCamera();
   setupRenderer();
@@ -43,6 +53,8 @@ export async function initGame(playerData: { name: string; avatar: any }) {
   scene.add(birthdayBanner);
   await createMyPlayer(playerData);
   setupControls();
+  setupMobileControls();
+  initMobileUI();
   connectToServer(playerData.name, playerData.avatar);
   animate();
 }
@@ -111,6 +123,37 @@ function setupLights() {
   directionalLight.shadow.mapSize.width = 2048;
   directionalLight.shadow.mapSize.height = 2048;
   scene.add(directionalLight);
+}
+
+function setupMobileControls() {
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  if (!isMobile) return;
+
+  const controls = document.getElementById("mobile-controls");
+  if (controls) controls.style.display = "flex";
+
+  document.getElementById("btn-jump")?.addEventListener("click", () => {
+    tryJump();
+  });
+
+  document.getElementById("btn-wave")?.addEventListener("click", () => {
+    tryWave();
+  });
+
+  document.getElementById("btn-birthday")?.addEventListener("click", () => {
+    tryHappyBirthday();
+  });
+}
+
+
+function initMobileUI() {
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!isMobile) return;
+
+  document.getElementById("joy-move")!.style.display = "block";
+
+  setupMoveJoystick();
 }
 
 function createGround() {
@@ -261,57 +304,164 @@ export function setMyPlayerPosition(position: { x: number; y: number; z: number 
   }
 }
 
+// function updateMovement() {
+//   if (!myPlayer) return;
+
+//   let moved = false;
+//   const direction = new THREE.Vector3();
+//   // ====== MOVIMENTAÇÃO VIA JOYSTICK =======
+//   if (joyMove.x !== 0 || joyMove.y !== 0) {
+//     const speed = 0.08;
+
+//     // Direção baseada no joystick
+//     const moveX = joyMove.x * speed;
+//     const moveZ = joyMove.y * speed;
+
+//     myPlayer.position.x += moveX;
+//     myPlayer.position.z += moveZ;
+
+//     // Enviar pro servidor
+//     sendMovement({
+//       x: myPlayer.position.x,
+//       y: myPlayer.position.y,
+//       z: myPlayer.position.z
+//     }, true);
+//   }
+
+//   if (keys['w'] || keys['arrowup']) direction.z -= 1;
+//   if (keys['s'] || keys['arrowdown']) direction.z += 1;
+//   if (keys['a'] || keys['arrowleft']) direction.x -= 1;
+//   if (keys['d'] || keys['arrowright']) direction.x += 1;
+
+//   if (direction.lengthSq() > 0) {
+//      moved = true;
+
+//      // normalize so diagonal is not faster
+//      direction.normalize();
+
+//      // 🟩 rotate to face movement
+//      const target = new THREE.Vector3(
+//          myPlayer.position.x + direction.x,
+//          myPlayer.position.y,
+//          myPlayer.position.z + direction.z
+//      );
+
+//      const quaternion = new THREE.Quaternion();
+//      const currentQuat = myPlayer.quaternion.clone();
+
+//      myPlayer.lookAt(target);               // sets the correct facing rotation
+//      quaternion.copy(myPlayer.quaternion);  // save the target rotation
+//      myPlayer.quaternion.copy(currentQuat); // restore original
+//      myPlayer.quaternion.slerp(quaternion, 0.2); // smooth rotate
+
+
+//      // 🟦 move forward based on direction
+//      myPlayer.position.x += direction.x * moveSpeed;
+//      myPlayer.position.z += direction.z * moveSpeed;
+//   }
+
+//   if (isJumping) {
+//      playerAnimations.get('idle')?.stop();
+//      playerAnimations.get('jump')?.play();
+//      velocityY += gravity;
+//      myPlayer.position.y += velocityY;
+
+//      // Ground check
+//      if (myPlayer.position.y <= 0) {
+//        myPlayer.position.y = 0;
+//        playerAnimations.get('jump')?.stop();
+//        isJumping = false;
+//        velocityY = 0;
+//      }
+//   }
+
+//   const isWaveAnimRunning = playerAnimations.get('wave')!.isRunning();
+//   if (isWaving && !isWaveAnimRunning) {
+//     isWaving = false;
+//   }
+
+//   if (moved) {
+//     playerAnimations.get('walk')?.play();
+//     playerAnimations.get('idle')?.stop();
+//   } else {
+//     playerAnimations.get('idle')?.play();
+//     playerAnimations.get('walk')?.stop();
+//   }
+
+//   // Keep player within bounds
+//   const maxDistance = 18;
+//   const distance = Math.sqrt(myPlayer.position.x ** 2 + myPlayer.position.z ** 2);
+//   if (distance > maxDistance) {
+//     const angle = Math.atan2(myPlayer.position.z, myPlayer.position.x);
+//     myPlayer.position.x = Math.cos(angle) * maxDistance;
+//     myPlayer.position.z = Math.sin(angle) * maxDistance;
+//   }
+
+//   // CHANGE: Always send position updates (even when stopped)
+//   // This way other players know when you stop moving
+//   sendMovement({
+//     x: myPlayer.position.x,
+//     y: myPlayer.position.y,
+//     z: myPlayer.position.z,
+//   }, moved); // Pass the 'moved' state
+// }
+
 function updateMovement() {
   if (!myPlayer) return;
 
-  let moved = false;
   const direction = new THREE.Vector3();
 
+  // ====== DIREÇÃO VIA TECLADO ======
   if (keys['w'] || keys['arrowup']) direction.z -= 1;
   if (keys['s'] || keys['arrowdown']) direction.z += 1;
   if (keys['a'] || keys['arrowleft']) direction.x -= 1;
   if (keys['d'] || keys['arrowright']) direction.x += 1;
 
-  if (direction.lengthSq() > 0) {
-     moved = true;
+  // ====== DIREÇÃO VIA JOYSTICK ======
+  if (joyMove.x !== 0) direction.x += joyMove.x;
+  if (joyMove.y !== 0) direction.z += joyMove.y;
 
-     // normalize so diagonal is not faster
-     direction.normalize();
+  // Determina se houve movimento
+  const moved = direction.lengthSq() > 0;
 
-     // 🟩 rotate to face movement
-     const target = new THREE.Vector3(
-         myPlayer.position.x + direction.x,
-         myPlayer.position.y,
-         myPlayer.position.z + direction.z
-     );
+  if (moved) {
+    // Normaliza para que a diagonal não seja mais rápida
+    direction.normalize();
 
-     const quaternion = new THREE.Quaternion();
-     const currentQuat = myPlayer.quaternion.clone();
+    // Rotação suave para direção do movimento
+    const target = new THREE.Vector3(
+      myPlayer.position.x + direction.x,
+      myPlayer.position.y,
+      myPlayer.position.z + direction.z
+    );
 
-     myPlayer.lookAt(target);               // sets the correct facing rotation
-     quaternion.copy(myPlayer.quaternion);  // save the target rotation
-     myPlayer.quaternion.copy(currentQuat); // restore original
-     myPlayer.quaternion.slerp(quaternion, 0.2); // smooth rotate
+    const quaternion = new THREE.Quaternion();
+    const currentQuat = myPlayer.quaternion.clone();
 
+    myPlayer.lookAt(target);              // Define direção
+    quaternion.copy(myPlayer.quaternion); // Salva alvo
+    myPlayer.quaternion.copy(currentQuat);
+    myPlayer.quaternion.slerp(quaternion, 0.2);
 
-     // 🟦 move forward based on direction
-     myPlayer.position.x += direction.x * moveSpeed;
-     myPlayer.position.z += direction.z * moveSpeed;
+    // Move o player
+    const moveSpeedFinal = moveSpeed; // Você pode ajustar separadamente se quiser
+    myPlayer.position.x += direction.x * moveSpeedFinal;
+    myPlayer.position.z += direction.z * moveSpeedFinal;
   }
 
+  // ====== ANIMAÇÕES ======
   if (isJumping) {
-     playerAnimations.get('idle')?.stop();
-     playerAnimations.get('jump')?.play();
-     velocityY += gravity;
-     myPlayer.position.y += velocityY;
+    playerAnimations.get('idle')?.stop();
+    playerAnimations.get('jump')?.play();
+    velocityY += gravity;
+    myPlayer.position.y += velocityY;
 
-     // Ground check
-     if (myPlayer.position.y <= 0) {
-       myPlayer.position.y = 0;
-       playerAnimations.get('jump')?.stop();
-       isJumping = false;
-       velocityY = 0;
-     }
+    if (myPlayer.position.y <= 0) {
+      myPlayer.position.y = 0;
+      playerAnimations.get('jump')?.stop();
+      isJumping = false;
+      velocityY = 0;
+    }
   }
 
   const isWaveAnimRunning = playerAnimations.get('wave')!.isRunning();
@@ -319,15 +469,16 @@ function updateMovement() {
     isWaving = false;
   }
 
+  // Atualiza animação de walk/idle
   if (moved) {
     playerAnimations.get('walk')?.play();
     playerAnimations.get('idle')?.stop();
-  } else {
-    playerAnimations.get('idle')?.play();
+  } else if (!isJumping && !isWaving) {
     playerAnimations.get('walk')?.stop();
+    playerAnimations.get('idle')?.play();
   }
 
-  // Keep player within bounds
+  // Limita o player dentro do círculo
   const maxDistance = 18;
   const distance = Math.sqrt(myPlayer.position.x ** 2 + myPlayer.position.z ** 2);
   if (distance > maxDistance) {
@@ -336,13 +487,12 @@ function updateMovement() {
     myPlayer.position.z = Math.sin(angle) * maxDistance;
   }
 
-  // CHANGE: Always send position updates (even when stopped)
-  // This way other players know when you stop moving
+  // Envia posição pro servidor
   sendMovement({
     x: myPlayer.position.x,
     y: myPlayer.position.y,
-    z: myPlayer.position.z,
-  }, moved); // Pass the 'moved' state
+    z: myPlayer.position.z
+  }, moved);
 }
 
 function animate() {

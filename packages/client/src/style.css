@@ -13,3 +13,88 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+.joystick {
+  position: fixed;
+  bottom: 80px;
+  width: 120px;
+  height: 120px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+  touch-action: none;
+  display: none;
+}
+
+#joy-move {
+  left: 30px;
+}
+
+.joystick .stick {
+  width: 60px;
+  height: 60px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 50%;
+  margin-left: 30px;
+  margin-top: 30px;
+  pointer-events: none;
+}
+
+/* Botão flutuante do chat */
+.mobile-chat-btn {
+  bottom: 20px;
+  right: 20px;
+  padding: 18px;
+  font-size: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  display: none; /* desktop: escondido */
+  z-index: 9999;
+}
+
+/* Mobile: mostra o botão */
+@media (max-width: 768px) {
+  .mobile-chat-btn {
+    display: block;
+  }
+
+  #chat-container {
+    display: none; /* escondido no mobile por padrão */
+  }
+
+  #chat-container.open {
+    display: block; /* aparece quando clicado */
+  }
+}
+
+.actions-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* distância entre os botões */
+
+  z-index: 999;
+}
+
+.action-btn {
+  width: 60px;
+  height: 60px;
+
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: 50%;
+  border: none;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: white;
+  font-size: 22px;
+
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
