@@ -11,6 +11,7 @@ export interface PlayerState {
   score: number;
   isAlive: boolean;
   avatar: Avatar;
+  sessionId?: string; // NOVO: Para reconexão
 };
 
 export const GAME_CONFIG = {
@@ -25,7 +26,8 @@ export interface GameState {
 }
 
 export interface ClientToServerEvents {
-  'player:join': { name: string, avatar: Avatar },
+  'player:join': { name: string; avatar: any; sessionId?: string }; // ATUALIZADO
+  'player:reconnect': { sessionId: string; name: string; avatar: any }; // NOVO
   'player:move': {
     position: { x: number; y: number; z: number };
     rotation: number;
@@ -36,7 +38,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
-  'game.init': { players: PlayerState[], yourId: string },
+  'game:init': { players: PlayerState[]; yourId: string; sessionId: string }; // ATUALIZADO
   'player:joined': PlayerState,
   'player:left': { id: string },
   'player:update': {
@@ -50,6 +52,8 @@ export interface ServerToClientEvents {
     isMoving?: boolean; // NEW: Optional movement state
   'player:waved': { id: string };
   'chat:message': { playerId: string; playerName: string; message: string };
+  'reconnect:success': { yourId: string; position: any }; // NOVO
+  'reconnect:failed': {}; // NOVO
   }
 }
 

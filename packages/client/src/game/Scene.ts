@@ -2,11 +2,13 @@ import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three-stdlib';
 import { createPlayerCharacter } from './Player';
 import { connectToServer, sendMovement, sendWave } from './Network';
+import { createBirthdayBanner } from './Banner';
 
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
 let renderer: THREE.WebGLRenderer;
 let labelRenderer: CSS2DRenderer;
+let birthdayBanner: THREE.Group | null = null;
 let myPlayer: THREE.Group | null = null;
 let myLabel: CSS2DObject | null = null;
 let myMixer: THREE.AnimationMixer | null = null;
@@ -33,6 +35,8 @@ export async function initGame(playerData: { name: string; avatar: any }) {
   setupRenderer();
   setupLights();
   createGround();
+  birthdayBanner = createBirthdayBanner();
+  scene.add(birthdayBanner);
   await createMyPlayer(playerData);
   setupControls();
   connectToServer(playerData.name, playerData.avatar);
@@ -235,6 +239,13 @@ function tryWave() {
   wave?.play();
 }
 
+export function setMyPlayerPosition(position: { x: number; y: number; z: number }) {
+  if (myPlayer) {
+    myPlayer.position.set(position.x, position.y, position.z);
+    console.log('Player position restored:', position);
+  }
+}
+
 function updateMovement() {
   if (!myPlayer) return;
 
@@ -333,6 +344,11 @@ function animate() {
   });
 
   updateMovement();
+
+  if (birthdayBanner) {
+      birthdayBanner.rotation.y = Math.sin(Date.now() * 0.0005) * 0.1;
+      birthdayBanner.position.y = 5 + Math.sin(Date.now() * 0.001) * 0.3;
+    }
 
   // Camera follows player
   if (myPlayer) {

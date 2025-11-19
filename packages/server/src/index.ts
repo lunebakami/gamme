@@ -2,6 +2,13 @@ import { Elysia } from 'elysia';
 import type { PlayerState } from '@gamme/shared';
 
 const players = new Map<string, PlayerState>();
+const sessions = new Map<string, string>(); // sessionId -> currentConnectionId
+const playerSessions = new Map<string, string>(); // connectionId -> sessionId
+
+// Gerar ID único de sessão
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 const app = new Elysia()
   .ws('/game', {
@@ -11,8 +18,77 @@ const app = new Elysia()
     message(ws, message: any) {
       const data = typeof message === 'string' ? JSON.parse(message) : message;
 
+      if (data.type === 'player:reconnect') {
+        const sessionId = data.sessionId;
+        const oldConnectionId = sessions.get(sessionId);
+
+        console.log({
+          sessionId,
+          sessions
+        })
+
+        if (oldConnectionId) {
+          // Encontrar o jogador antigo
+          const oldPlayer = players.get(oldConnectionId);
+
+          if (oldPlayer) {
+            // Remover conexão antiga
+            players.delete(oldConnectionId);
+            playerSessions.delete(oldConnectionId);
+
+            // Criar novo jogador com mesmo estado
+            const playerId = ws.id as string;
+            const reconnectedPlayer: PlayerState = {
+              ...oldPlayer,
+              id: playerId,
+              name: data.name,
+              avatar: data.avatar,
+              sessionId: sessionId,
+            };
+
+            players.set(playerId, reconnectedPlayer);
+            sessions.set(sessionId, playerId);
+            playerSessions.set(playerId, sessionId);
+
+            // Subscribe
+            ws.subscribe('game');
+
+            // Enviar confirmação de reconexão
+            ws.send(JSON.stringify({
+              type: 'reconnect:success',
+              yourId: playerId,
+              position: reconnectedPlayer.position,
+            }));
+
+            // Enviar estado do jogo
+            ws.send(JSON.stringify({
+              type: 'game:init',
+              players: Array.from(players.values()),
+              yourId: playerId,
+              sessionId: sessionId,
+            }));
+
+            // Notificar outros jogadores
+            ws.publish('game', JSON.stringify({
+              type: 'player:joined',
+              player: reconnectedPlayer,
+            }));
+
+            console.log(`Player ${data.name} reconnected with session ${sessionId}`);
+            return;
+          }
+        }
+
+        // Falha na reconexão - enviar falha
+        ws.send(JSON.stringify({
+          type: 'reconnect:failed',
+        }));
+        return;
+      }
+
       if (data.type === 'player:join') {
         const playerId = ws.id as string;
+        const sessionId = data.sessionId || generateSessionId();
 
         const newPlayer: PlayerState = {
           id: playerId,
@@ -22,9 +98,12 @@ const app = new Elysia()
           score: 0,
           isAlive: true,
           avatar: data.avatar,
+          sessionId,
         };
 
         players.set(playerId, newPlayer);
+        sessions.set(sessionId, playerId);
+        playerSessions.set(playerId, sessionId);
 
         // Subscribe this connection to game channel
         ws.subscribe('game')
@@ -35,7 +114,7 @@ const app = new Elysia()
           players: Array.from(players.values()),
           yourId: playerId,
           name: data.name,
-          score: 0,
+          sessionId,
         }))
 
         // Broadcast the new player's state to all other players
@@ -97,15 +176,26 @@ const app = new Elysia()
     close(ws) {
       const playerId = ws.id;
       const player = players.get(playerId);
-      if (player) {
-        players.delete(playerId);
-        // Notify other players that the player has left
-        ws.publish('game', JSON.stringify({
-          type: 'player:left',
-          id: playerId
-        }))
+      const sessionId = playerSessions.get(playerId);
 
-        console.log(`Player ${player.name} (${playerId}) left. Total players: ${players.size}`);
+      if (player) {
+        console.log(`Player ${player.name} (${playerId}) disconnected. Waiting for reconnection...`);
+        setTimeout(() => {
+          // Verificar se ainda está desconectado
+          const currentConnectionId = sessions.get(sessionId!);
+          if (currentConnectionId === playerId) {
+            players.delete(playerId);
+            sessions.delete(sessionId!);
+            playerSessions.delete(playerId);
+
+            ws.publish('game', JSON.stringify({
+              type: 'player:left',
+              id: playerId,
+            }));
+
+            console.log(`Player ${player.name} (${playerId}) removed after timeout. Total players: ${players.size}`);
+          }
+        }, 30000)
       }
     }
   })
