@@ -292,7 +292,7 @@ function tryHappyBirthday() {
   if (!myPlayerId || !myPlayer || saidHappyBirthday) return;
 
   saidHappyBirthday = true;
-  showBubbleForPlayer(myPlayerId!, 'Happy Birthday!', myPlayer);
+  showBubbleForPlayer(myPlayerId!, 'Feliz Aniversário Joyce!!!', myPlayer);
   sendHappyBirthday();
   tryWave();
 }
