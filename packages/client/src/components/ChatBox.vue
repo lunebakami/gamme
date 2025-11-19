@@ -87,6 +87,7 @@ const sendMessage = () => {
     </div>
     <div class="chat-input">
       <input
+        id="chat-input"
         v-model="messageInput"
         type="text"
         placeholder="Type a message... (Press Enter)"

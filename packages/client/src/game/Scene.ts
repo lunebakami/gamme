@@ -21,6 +21,7 @@ const clock = new THREE.Clock();
 let isJumping = false;
 let isWaving = false;
 let saidHappyBirthday = false;
+let chatFocused = false;
 let velocityY = 0;
 const gravity = -0.009;   // tweak this
 const jumpStrength = 0.18; // tweak this
@@ -44,6 +45,15 @@ export async function initGame(playerData: { name: string; avatar: any }) {
     chat.classList.toggle("open");
   });
 
+  const chatInput = document.getElementById("chat-input") as HTMLInputElement;
+
+  chatInput?.addEventListener("focus", () => {
+    chatFocused = true;
+  });
+
+  chatInput?.addEventListener("blur", () => {
+    chatFocused = false;
+  })
   setupScene();
   setupCamera();
   setupRenderer();
@@ -304,110 +314,8 @@ export function setMyPlayerPosition(position: { x: number; y: number; z: number 
   }
 }
 
-// function updateMovement() {
-//   if (!myPlayer) return;
-
-//   let moved = false;
-//   const direction = new THREE.Vector3();
-//   // ====== MOVIMENTAÇÃO VIA JOYSTICK =======
-//   if (joyMove.x !== 0 || joyMove.y !== 0) {
-//     const speed = 0.08;
-
-//     // Direção baseada no joystick
-//     const moveX = joyMove.x * speed;
-//     const moveZ = joyMove.y * speed;
-
-//     myPlayer.position.x += moveX;
-//     myPlayer.position.z += moveZ;
-
-//     // Enviar pro servidor
-//     sendMovement({
-//       x: myPlayer.position.x,
-//       y: myPlayer.position.y,
-//       z: myPlayer.position.z
-//     }, true);
-//   }
-
-//   if (keys['w'] || keys['arrowup']) direction.z -= 1;
-//   if (keys['s'] || keys['arrowdown']) direction.z += 1;
-//   if (keys['a'] || keys['arrowleft']) direction.x -= 1;
-//   if (keys['d'] || keys['arrowright']) direction.x += 1;
-
-//   if (direction.lengthSq() > 0) {
-//      moved = true;
-
-//      // normalize so diagonal is not faster
-//      direction.normalize();
-
-//      // 🟩 rotate to face movement
-//      const target = new THREE.Vector3(
-//          myPlayer.position.x + direction.x,
-//          myPlayer.position.y,
-//          myPlayer.position.z + direction.z
-//      );
-
-//      const quaternion = new THREE.Quaternion();
-//      const currentQuat = myPlayer.quaternion.clone();
-
-//      myPlayer.lookAt(target);               // sets the correct facing rotation
-//      quaternion.copy(myPlayer.quaternion);  // save the target rotation
-//      myPlayer.quaternion.copy(currentQuat); // restore original
-//      myPlayer.quaternion.slerp(quaternion, 0.2); // smooth rotate
-
-
-//      // 🟦 move forward based on direction
-//      myPlayer.position.x += direction.x * moveSpeed;
-//      myPlayer.position.z += direction.z * moveSpeed;
-//   }
-
-//   if (isJumping) {
-//      playerAnimations.get('idle')?.stop();
-//      playerAnimations.get('jump')?.play();
-//      velocityY += gravity;
-//      myPlayer.position.y += velocityY;
-
-//      // Ground check
-//      if (myPlayer.position.y <= 0) {
-//        myPlayer.position.y = 0;
-//        playerAnimations.get('jump')?.stop();
-//        isJumping = false;
-//        velocityY = 0;
-//      }
-//   }
-
-//   const isWaveAnimRunning = playerAnimations.get('wave')!.isRunning();
-//   if (isWaving && !isWaveAnimRunning) {
-//     isWaving = false;
-//   }
-
-//   if (moved) {
-//     playerAnimations.get('walk')?.play();
-//     playerAnimations.get('idle')?.stop();
-//   } else {
-//     playerAnimations.get('idle')?.play();
-//     playerAnimations.get('walk')?.stop();
-//   }
-
-//   // Keep player within bounds
-//   const maxDistance = 18;
-//   const distance = Math.sqrt(myPlayer.position.x ** 2 + myPlayer.position.z ** 2);
-//   if (distance > maxDistance) {
-//     const angle = Math.atan2(myPlayer.position.z, myPlayer.position.x);
-//     myPlayer.position.x = Math.cos(angle) * maxDistance;
-//     myPlayer.position.z = Math.sin(angle) * maxDistance;
-//   }
-
-//   // CHANGE: Always send position updates (even when stopped)
-//   // This way other players know when you stop moving
-//   sendMovement({
-//     x: myPlayer.position.x,
-//     y: myPlayer.position.y,
-//     z: myPlayer.position.z,
-//   }, moved); // Pass the 'moved' state
-// }
-
 function updateMovement() {
-  if (!myPlayer) return;
+  if (!myPlayer || chatFocused) return;
 
   const direction = new THREE.Vector3();
 
